@@ -4,7 +4,16 @@
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello, World!");
+            var source = "IF+-123 foo*THEN/";
+            Lexer lexer = new Lexer(source);
+
+            var token = lexer.GetToken();
+
+            while (token.Kind != TokenType.EOF)
+            {
+                Console.WriteLine($"{token.Kind} :: {token.Text}");
+                token = lexer.GetToken();
+            }
         }
     }
 }
