@@ -8,14 +8,14 @@ namespace Teeny_Tiny
         {
             Console.WriteLine("Teeny Tiny Compiler");
 
-            if (args.Length != 2)
-            {
-                Console.WriteLine("Error: Compiler needs source file as argument.");
-                Environment.Exit(1);
-            }
+            //if (args.Length != 2)
+            //{
+            //    Console.WriteLine("Error: Compiler needs source file as argument.");
+            //    Environment.Exit(1);
+            //}
 
             string source;
-            using (StreamReader reader = new StreamReader(args[1], Encoding.UTF8))
+            using (StreamReader reader = new StreamReader("C:\\Users\\matus\\source\\repos\\Teeny Tiny progs\\hello.teeny", Encoding.UTF8))
             {
                 source = reader.ReadToEnd();
             }
@@ -23,7 +23,7 @@ namespace Teeny_Tiny
             Lexer lexer = new Lexer(source);
             Parser parser = new Parser(lexer);
 
-            parser.program();
+            parser.Program();
             Console.WriteLine("Parsing completed.");
         }
     }
