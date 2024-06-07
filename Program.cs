@@ -15,16 +15,18 @@ namespace Teeny_Tiny
             //}
 
             string source;
-            using (StreamReader reader = new StreamReader("C:\\Users\\matus\\source\\repos\\Teeny Tiny progs\\hello.teeny", Encoding.UTF8))
+            using (StreamReader reader = new StreamReader("C:\\Users\\matus\\source\\repos\\Teeny Tiny progs\\average.teeny", Encoding.UTF8))
             {
                 source = reader.ReadToEnd();
             }
 
             Lexer lexer = new Lexer(source);
-            Parser parser = new Parser(lexer);
+            Emitter emitter = new Emitter("C:\\Users\\matus\\source\\repos\\Teeny Tiny progs\\average.c");
+            Parser parser = new Parser(lexer, emitter);
 
             parser.Program();
-            Console.WriteLine("Parsing completed.");
+            emitter.WriteFile();
+            Console.WriteLine("Compiling completed.");
         }
     }
 }
