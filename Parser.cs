@@ -1,20 +1,20 @@
-﻿using System.Runtime.InteropServices;
-
-namespace Teeny_Tiny
+﻿namespace Teeny_Tiny
 {
     public class Parser
     {
         public Token CurToken { get; set; }
         public Token PeekToken { get; set; }
         public Lexer Lexer { get; set; }
+        public Emitter Emitter { get; set; }
 
         public List<string> Symbols { get; set; } = new();
         public List<string> LabelsDeclared { get; set; } = new();
         public List<string> LabelsGotoed { get; set; } = new();
 
-        public Parser(Lexer lexer)
+        public Parser(Lexer lexer, Emitter emitter)
         {
             Lexer = lexer;
+            Emitter = emitter;
             NextToken();
             NextToken();
         }
@@ -56,7 +56,8 @@ namespace Teeny_Tiny
 
         public void Program()
         {
-            Console.WriteLine("PROGRAM");
+            Emitter.HeaderLine("#include <stdio.h>");
+            Emitter.HeaderLine("int main(void){");
             while (CheckToken(TokenType.NEWLINE))
             {
                 NextToken();
@@ -65,6 +66,9 @@ namespace Teeny_Tiny
             {
                 Statement();
             }
+
+            Emitter.EmitLine("return 0;");
+            Emitter.EmitLine("}");
 
             foreach (var label in LabelsGotoed)
             {
@@ -79,81 +83,94 @@ namespace Teeny_Tiny
         {
             if (CheckToken(TokenType.PRINT))
             {
-                Console.WriteLine("STATEMENT-PRINT");
                 NextToken();
                 if (CheckToken(TokenType.STRING))
                 {
+                    Emitter.EmitLine($"printf(\"{CurToken.Text}\\n\");");
                     NextToken();
                 }
                 else
                 {
+                    Emitter.Emit("printf(\"%.2f\\n\", (float)(");
                     Expression();
+                    Emitter.EmitLine("));");
                 }
             }
             else if (CheckToken(TokenType.IF))
             {
-                Console.WriteLine("STATEMENT-IF");
                 NextToken();
+                Emitter.Emit("if(");
                 Comparison();
                 Match(TokenType.THEN);
                 Nl();
+                Emitter.EmitLine("){");
                 while (!CheckToken(TokenType.ENDIF))
                 {
                     Statement();
                 }
                 Match(TokenType.ENDIF);
+                Emitter.EmitLine("}");
             }
             else if (CheckToken(TokenType.WHILE))
             {
-                Console.WriteLine("STATEMENT-WHILE");
                 NextToken();
+                Emitter.Emit("while(");
                 Comparison();
                 Match(TokenType.REPEAT);
                 Nl();
+                Emitter.EmitLine("){");
                 while (!CheckToken(TokenType.ENDWHILE))
                 {
                     Statement();
                 }
                 Match(TokenType.ENDWHILE);
+                Emitter.EmitLine("}");
             }
             else if (CheckToken(TokenType.LABEL))
             {
-                Console.WriteLine("STATEMENT-LABEL");
                 NextToken();
                 if (LabelsDeclared.Contains(CurToken.Text))
                 {
                     Abort($"Label already exists: {CurToken.Text}");
                 }
                 LabelsDeclared.Add(CurToken.Text);
+                Emitter.EmitLine($"{CurToken.Text}:");
                 Match(TokenType.IDENT);
             } 
             else if (CheckToken(TokenType.GOTO))
             {
-                Console.WriteLine("STATEMENT-GOTO");
                 NextToken();
                 LabelsGotoed.Add(CurToken.Text);
+                Emitter.EmitLine($"goto {CurToken.Text};");
                 Match(TokenType.IDENT);
             }
             else if (CheckToken(TokenType.LET))
             {
-                Console.WriteLine("STATEMENT-LET");
                 NextToken();
                 if (!Symbols.Contains(CurToken.Text))
                 {
                     Symbols.Add(CurToken.Text);
+                    Emitter.HeaderLine($"float {CurToken.Text};");
                 }
+                Emitter.Emit($"{CurToken.Text} = ");
                 Match(TokenType.IDENT);
                 Match(TokenType.EQ);
                 Expression();
+                Emitter.EmitLine(";");
             }
             else if (CheckToken(TokenType.INPUT))
             {
-                Console.WriteLine("STATEMENT-INPUT");
                 NextToken();
                 if (!Symbols.Contains(CurToken.Text))
                 {
                     Symbols.Add(CurToken.Text);
+                    Emitter.HeaderLine($"float {CurToken.Text};");
                 }
+                Emitter.EmitLine($"if(0 == scanf(\"%f\", &{CurToken.Text})) {{");
+                Emitter.EmitLine($"{CurToken.Text} = 0;");
+                Emitter.Emit("scanf(\"%");
+                Emitter.EmitLine("*s\");");
+                Emitter.EmitLine("}");
                 Match(TokenType.IDENT);
             }
             else
@@ -166,10 +183,10 @@ namespace Teeny_Tiny
 
         public void Comparison()
         {
-            Console.WriteLine("COMPARISON");
             Expression();
             if (IsComparisonOperator())
             {
+                Emitter.Emit(CurToken.Text);
                 NextToken();
                 Expression();
             }
@@ -180,6 +197,7 @@ namespace Teeny_Tiny
 
             while (IsComparisonOperator())
             {
+                Emitter.Emit(CurToken.Text);
                 NextToken();
                 Expression();
             }
@@ -187,10 +205,10 @@ namespace Teeny_Tiny
 
         public void Expression()
         {
-            Console.WriteLine("EXPRESSION");
             Term();
             while (CheckToken(TokenType.PLUS) || CheckToken(TokenType.MINUS))
             {
+                Emitter.Emit(CurToken.Text);
                 NextToken();
                 Term();
             }
@@ -198,10 +216,10 @@ namespace Teeny_Tiny
 
         public void Term()
         {
-            Console.WriteLine("TERM");
             Unary();
             while (CheckToken(TokenType.ASTERISK) || CheckToken(TokenType.SLASH))
             {
+                Emitter.Emit(CurToken.Text);
                 NextToken();
                 Unary();
             }
@@ -209,9 +227,9 @@ namespace Teeny_Tiny
 
         public void Unary()
         {
-            Console.WriteLine("UNARY");
             if (CheckToken(TokenType.PLUS) || CheckToken(TokenType.MINUS))
             {
+                Emitter.Emit(CurToken.Text);
                 NextToken();
             }
 
@@ -220,9 +238,9 @@ namespace Teeny_Tiny
 
         public void Primary()
         {
-            Console.WriteLine($"PRIMARY ({CurToken.Text})");
             if (CheckToken(TokenType.NUMBER))
             {
+                Emitter.Emit(CurToken.Text);
                 NextToken();
             }
             else if (CheckToken(TokenType.IDENT))
@@ -231,6 +249,7 @@ namespace Teeny_Tiny
                 {
                     Abort($"Referencing variable before assignment: {CurToken.Text}");
                 }
+                Emitter.Emit(CurToken.Text);
                 NextToken();    
             }
             else
@@ -251,7 +270,6 @@ namespace Teeny_Tiny
 
         public void Nl()
         {
-            Console.WriteLine("NEWLINE");
             Match(TokenType.NEWLINE);
             while (CheckToken(TokenType.NEWLINE))
             {
